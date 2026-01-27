@@ -80,6 +80,10 @@ class VehicleCaptureSystem:
         self.trackers: Dict[str, AdvancedVehicleTracker] = {}
         self.performance_monitor = PerformanceMonitor()
         
+        # Global counters
+        self.global_vehicle_count = 0
+        self.global_saved_count = 0
+        
         # Setup cameras
         self._setup_cameras()
         
@@ -358,13 +362,22 @@ class VehicleCaptureSystem:
                        font, font_scale, fps_color, thickness)
         y += line_height
         
-        # Vehicle counts
-        cv2.putText(frame, f"Total Vehicles: {tracker_stats['total_vehicles']}", 
+        # Update global counts
+        self.global_vehicle_count = sum(t.total_vehicles for t in self.trackers.values())
+        self.global_saved_count = sum(t.saved_frames for t in self.trackers.values())
+        
+        # Vehicle counts (show both camera and global)
+        cv2.putText(frame, f"Camera Vehicles: {tracker_stats['total_vehicles']}", 
                    (20, y), font, font_scale, (255, 255, 255), thickness)
         y += line_height
         
-        cv2.putText(frame, f"Frames Saved: {tracker_stats['saved_frames']}", 
+        cv2.putText(frame, f"Camera Saved: {tracker_stats['saved_frames']}", 
                    (20, y), font, font_scale, (0, 255, 255), thickness)
+        y += line_height
+        
+        # Show global counts
+        cv2.putText(frame, f"TOTAL: {self.global_saved_count} / {self.global_vehicle_count}", 
+                   (20, y), font, font_scale, (0, 255, 0), thickness + 1)
         y += line_height
         
         cv2.putText(frame, f"Active Tracks: {tracker_stats['active_tracks']}", 

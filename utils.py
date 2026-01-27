@@ -265,17 +265,25 @@ class FileManager:
             Success status
         """
         try:
+            # Ensure directory exists
             filepath.parent.mkdir(parents=True, exist_ok=True)
             
-            if format.lower() == "jpg":
-                params = [cv2.IMWRITE_JPEG_QUALITY, quality]
-            else:
-                params = [cv2.IMWRITE_PNG_COMPRESSION, 0]
+            # Set encoding parameters for maximum quality
+            if format.lower() in ["jpg", "jpeg"]:
+                params = [
+                    cv2.IMWRITE_JPEG_QUALITY, quality,
+                    cv2.IMWRITE_JPEG_OPTIMIZE, 1,
+                    cv2.IMWRITE_JPEG_PROGRESSIVE, 1
+                ]
+            else:  # PNG
+                params = [
+                    cv2.IMWRITE_PNG_COMPRESSION, 0,  # No compression = highest quality
+                ]
             
             success = cv2.imwrite(str(filepath), image, params)
             
             if success:
-                logger.debug(f"Saved image: {filepath}")
+                logger.debug(f"Saved image: {filepath.name}")
             else:
                 logger.error(f"Failed to save image: {filepath}")
             

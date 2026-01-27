@@ -316,9 +316,10 @@ class AdvancedVehicleTracker:
             True if saved successfully
         """
         try:
-            # Generate filenames
-            frame_filename = f"frame_{self.saved_frames}.{self.save_format}"
-            crop_filename = f"frame_{self.saved_frames}.{self.save_format}"
+            # Generate filenames with timestamp and camera for uniqueness
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            frame_filename = f"{self.camera_name}_vehicle_{self.saved_frames}_{timestamp}.{self.save_format}"
+            crop_filename = f"{self.camera_name}_vehicle_{self.saved_frames}_{timestamp}.{self.save_format}"
             
             frame_path = self.save_dir_frame / frame_filename
             crop_path = self.save_dir_crop / crop_filename

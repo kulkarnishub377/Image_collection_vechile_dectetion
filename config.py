@@ -17,8 +17,8 @@ class CameraConfig:
     rtsp_url: str
     enabled: bool = True
     resolution: Tuple[int, int] = (1920, 1080)
-    fps_target: int = 25
-    buffer_size: int = 2
+    fps_target: int = 30
+    buffer_size: int = 3
 
 
 @dataclass

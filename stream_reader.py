@@ -172,18 +172,25 @@ class RTSPStreamReader:
         try:
             logger.info(f"Connecting to {self.camera_name}...")
             
+            # Use FFMPEG backend with options for best quality
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
             
             if not cap.isOpened():
                 logger.error(f"Failed to open stream: {self.camera_name}")
                 return None
             
-            # Set buffer size (lower = less latency)
+            # Set buffer size (lower = less latency, but keep some for stability)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer_size)
             
-            # Try to set target resolution
+            # Request highest quality settings
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))
+            
+            # Set maximum resolution
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.target_resolution[0])
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.target_resolution[1])
+            
+            # Request highest FPS available
+            cap.set(cv2.CAP_PROP_FPS, 30)
             
             # Get actual resolution
             actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
