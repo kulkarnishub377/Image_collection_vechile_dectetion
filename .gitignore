@@ -1,0 +1,6 @@
+images/
+*.log
+*.tmp
+*.pyc
+__pycache__/
+.env

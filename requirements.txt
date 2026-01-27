@@ -1,0 +1,19 @@
+# Requirements for Professional Vehicle Capture System
+
+# Core Dependencies
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Optional: GPU acceleration
+# torch>=2.0.0  # Uncomment for CUDA support
+# torchvision>=0.15.0
+
+# Optional: Performance boost
+# onnx  # For ONNX export
+# onnxruntime-gpu  # For ONNX inference with GPU
+
+# Development (optional)
+# pytest  # For testing
+# black  # For code formatting
+# flake8  # For linting
