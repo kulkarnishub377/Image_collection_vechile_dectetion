@@ -5,13 +5,17 @@ Run this file directly for immediate functionality
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
+try:
+    from ultralytics import YOLO
+except:
+    from ultralytics.yolo import YOLO
 import threading
 import time
 from pathlib import Path
 import json
 from datetime import datetime
 from collections import defaultdict
+import os
 
 # ============================================================================
 # CONFIGURATION
@@ -35,11 +39,13 @@ FRAME_DIR = BASE_DIR / "frame"
 CROP_DIR = BASE_DIR / "croped"
 ROI_CONFIG = "roi_config.json"
 
-# Quality settings
+# Quality settings - MAXIMUM QUALITY
 SAVE_FORMAT = "jpg"
-JPEG_QUALITY = 100  # Maximum quality
-RESOLUTION = (1920, 1080)
-BUFFER_SIZE = 3
+JPEG_QUALITY = 100  # Maximum quality (100 = best)
+RESOLUTION = (1920, 1080)  # Full HD
+BUFFER_SIZE = 1  # Lower buffer = less latency, higher quality
+RTSP_TRANSPORT = "tcp"  # More reliable than UDP
+RECONNECT_DELAY = 1.0  # Fast reconnection
 
 # Vehicle classes
 VEHICLE_CLASSES = ['auto_rickshaw', 'bike', 'bus', 'car', 'mini_bus', 'tractor', 'truck']
@@ -172,52 +178,81 @@ class StreamReader:
         cap = None
         fps_count = 0
         fps_time = time.time()
+        consecutive_failures = 0
         
         while self.running:
             try:
                 if cap is None or not cap.isOpened():
                     print(f"Connecting to {self.name}...")
-                    cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+                    
+                    # Build RTSP URL with TCP transport for better quality
+                    rtsp_options = "?tcp" if "?" not in self.url else "&tcp"
+                    url_with_options = self.url + rtsp_options
+                    
+                    # Create capture with optimized settings
+                    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|buffer_size;1024000|max_delay;500000"
+                    cap = cv2.VideoCapture(url_with_options, cv2.CAP_FFMPEG)
                     
                     if cap.isOpened():
-                        # Set highest quality
+                        # CRITICAL: Set these BEFORE reading frames
                         cap.set(cv2.CAP_PROP_BUFFERSIZE, BUFFER_SIZE)
-                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))
+                        
+                        # Request maximum quality
                         cap.set(cv2.CAP_PROP_FRAME_WIDTH, RESOLUTION[0])
                         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, RESOLUTION[1])
                         cap.set(cv2.CAP_PROP_FPS, 30)
                         
+                        # Disable auto-exposure for consistent quality
+                        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+                        
+                        # Get actual settings
                         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        print(f"✓ Connected {self.name}: {actual_w}x{actual_h}")
+                        actual_fps = int(cap.get(cv2.CAP_PROP_FPS))
+                        
+                        print(f"✓ Connected {self.name}: {actual_w}x{actual_h} @ {actual_fps}fps")
+                        consecutive_failures = 0
                     else:
-                        time.sleep(2)
+                        consecutive_failures += 1
+                        wait_time = min(RECONNECT_DELAY * consecutive_failures, 10)
+                        print(f"⚠ Connection failed, retrying in {wait_time:.1f}s...")
+                        time.sleep(wait_time)
                         continue
                 
                 ret, frame = cap.read()
-                if ret:
-                    with self.lock:
-                        self.frame = frame
-                    
-                    # Calculate FPS
-                    fps_count += 1
-                    if time.time() - fps_time >= 1.0:
-                        self.fps = fps_count
-                        fps_count = 0
-                        fps_time = time.time()
+                if ret and frame is not None:
+                    # Verify frame quality
+                    if frame.shape[0] > 0 and frame.shape[1] > 0:
+                        with self.lock:
+                            self.frame = frame
+                        
+                        # Calculate FPS
+                        fps_count += 1
+                        if time.time() - fps_time >= 1.0:
+                            self.fps = fps_count
+                            fps_count = 0
+                            fps_time = time.time()
+                        
+                        consecutive_failures = 0
+                    else:
+                        print(f"⚠ Invalid frame size: {self.name}")
                 else:
-                    print(f"⚠ Frame read failed: {self.name}")
-                    if cap:
-                        cap.release()
-                    cap = None
-                    time.sleep(2)
+                    consecutive_failures += 1
+                    if consecutive_failures > 5:
+                        print(f"⚠ Multiple frame failures: {self.name}, reconnecting...")
+                        if cap:
+                            cap.release()
+                        cap = None
+                    time.sleep(0.1)
             
             except Exception as e:
-                print(f"Error in {self.name}: {e}")
+                print(f"❌ Error in {self.name}: {e}")
+                consecutive_failures += 1
                 if cap:
                     cap.release()
                 cap = None
-                time.sleep(2)
+                wait_time = min(RECONNECT_DELAY * consecutive_failures, 5)
+                time.sleep(wait_time)
         
         if cap:
             cap.release()
@@ -314,13 +349,29 @@ class VehicleTracker:
                 self.camera_saved_count += 1
             
             frame_name = f"vehicle_{count:06d}_{self.camera_name}_{timestamp}.{SAVE_FORMAT}"
-            crop_name = f"vehicle_{count:06d}_{self.camera_name}_{timestamp}.{SAVE_FORMAT}"
-            
-            # Save full frame (highest quality)
+            crop_name = f"vehiwith MAXIMUM QUALITY
             frame_path = self.save_frame_dir / frame_name
-            params = [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY, 
-                     cv2.IMWRITE_JPEG_OPTIMIZE, 1,
-                     cv2.IMWRITE_JPEG_PROGRESSIVE, 1]
+            if SAVE_FORMAT.lower() == "jpg":
+                params = [
+                    cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY,  # 100 = best
+                    cv2.IMWRITE_JPEG_OPTIMIZE, 1,  # Optimize encoding
+                    cv2.IMWRITE_JPEG_PROGRESSIVE, 1,  # Progressive
+                    cv2.IMWRITE_JPEG_LUMA_QUALITY, JPEG_QUALITY,  # Luma quality
+                    cv2.IMWRITE_JPEG_CHROMA_QUALITY, JPEG_QUALITY  # Chroma quality
+                ]
+            else:  # PNG
+                params = [
+                    cv2.IMWRITE_PNG_COMPRESSION, 0,  # 0 = no compression = best quality
+                ]
+            
+            success = cv2.imwrite(str(frame_path), frame, params)
+            if not success:
+                print(f"❌ Failed to save frame: {frame_path}")
+                return
+                 rop_success = cv2.imwrite(str(crop_path), crop, params)
+                if not crop_success:
+                    print(f"❌ Failed to save crop: {crop_path}")
+                    return
             cv2.imwrite(str(frame_path), frame, params)
             
             # Save crop
@@ -395,15 +446,18 @@ def main():
         rois[cam_name] = SimpleROI(cam_name)
         
         # Tracker
-        frame_dir = FRAME_DIR / cam_name
-        crop_dir = CROP_DIR / cam_name
-        trackers[cam_name] = VehicleTracker(cam_name, rois[cam_name], frame_dir, crop_dir)
-    
-    # Start streams
-    print("\n📡 Starting streams...")
-    for stream in streams.values():
-        stream.start()
-    
+        frame = None
+        for _ in range(100):
+            frame = streams[cam_name].get_frame()
+            if frame is not None:
+                break
+            time.sleep(0.1)
+        
+        if frame is not None:
+            print(f"\n>>> Draw ROI for {cam_name}")
+            roi.draw_interactive(frame)
+        else:
+            print(f"⚠ Could not get frame from {cam_name} - skipping ROI setup"
     time.sleep(3)
     
     # Setup ROIs
@@ -422,14 +476,17 @@ def main():
         if frame is not None:
             print(f"\n>>> Draw ROI for {cam_name}")
             roi.draw_interactive(frame)
-    
-    # Main loop
-    print("\n✅ System running! Press 'q' to quit\n")
-    
-    cv2.namedWindow("Vehicle Tracking System", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Vehicle Tracking System", 1920, 1080)
-    
-    try:
+     with optimized settings
+                    results = model.track(
+                        frame,
+                        conf=CONFIDENCE,
+                        iou=IOU_THRESHOLD,
+                        persist=True,
+                        tracker="bytetrack.yaml",
+                        verbose=False,
+                        imgsz=1280,  # Higher resolution for better detection
+                        half=False,  # Full precision = better quality
+                        device='0' if cv2.cuda.getCudaEnabledDeviceCount() > 0 else 'cpu'
         while True:
             frames_to_show = []
             
