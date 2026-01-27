@@ -5,13 +5,20 @@ Run this file directly for immediate functionality
 
 import cv2
 import numpy as np
-try:
-    from ultralytics import YOLO
-except:
-    from ultralytics.yolo import YOLO
 import threading
 import time
 from pathlib import Path
+
+# Import YOLO model
+try:
+    from ultralytics import YOLO
+except ImportError:
+    try:
+        from ultralytics.yolo import YOLO
+    except ImportError:
+        print("ERROR: Cannot import YOLO. Install: pip install ultralytics")
+        import sys
+        sys.exit(1)
 import json
 from datetime import datetime
 from collections import defaultdict
@@ -349,7 +356,9 @@ class VehicleTracker:
                 self.camera_saved_count += 1
             
             frame_name = f"vehicle_{count:06d}_{self.camera_name}_{timestamp}.{SAVE_FORMAT}"
-            crop_name = f"vehiwith MAXIMUM QUALITY
+            crop_name = f"vehicle_{count:06d}_{self.camera_name}_{timestamp}.{SAVE_FORMAT}"
+            
+            # Save full frame with MAXIMUM QUALITY
             frame_path = self.save_frame_dir / frame_name
             if SAVE_FORMAT.lower() == "jpg":
                 params = [
@@ -368,11 +377,6 @@ class VehicleTracker:
             if not success:
                 print(f"❌ Failed to save frame: {frame_path}")
                 return
-                 rop_success = cv2.imwrite(str(crop_path), crop, params)
-                if not crop_success:
-                    print(f"❌ Failed to save crop: {crop_path}")
-                    return
-            cv2.imwrite(str(frame_path), frame, params)
             
             # Save crop
             x1, y1, x2, y2 = map(int, box)
@@ -386,7 +390,10 @@ class VehicleTracker:
             crop = frame[y1:y2, x1:x2]
             if crop.size > 0:
                 crop_path = self.save_crop_dir / crop_name
-                cv2.imwrite(str(crop_path), crop, params)
+                crop_success = cv2.imwrite(str(crop_path), crop, params)
+                if not crop_success:
+                    print(f"❌ Failed to save crop: {crop_path}")
+                    return
             
             class_name = VEHICLE_CLASSES[cls] if cls < len(VEHICLE_CLASSES) else f"class_{cls}"
             print(f"✓ [{self.camera_name}] Saved #{count:06d} - {class_name} (ID:{track_id})")
@@ -457,7 +464,7 @@ def main():
             print(f"\n>>> Draw ROI for {cam_name}")
             roi.draw_interactive(frame)
         else:
-            print(f"⚠ Could not get frame from {cam_name} - skipping ROI setup"
+            print(f"⚠ Could not get frame from {cam_name} - skipping ROI setup")
     time.sleep(3)
     
     # Setup ROIs
@@ -476,17 +483,16 @@ def main():
         if frame is not None:
             print(f"\n>>> Draw ROI for {cam_name}")
             roi.draw_interactive(frame)
-     with optimized settings
-                    results = model.track(
-                        frame,
-                        conf=CONFIDENCE,
-                        iou=IOU_THRESHOLD,
-                        persist=True,
-                        tracker="bytetrack.yaml",
-                        verbose=False,
-                        imgsz=1280,  # Higher resolution for better detection
-                        half=False,  # Full precision = better quality
-                        device='0' if cv2.cuda.getCudaEnabledDeviceCount() > 0 else 'cpu'
+        else:
+            print(f"⚠ Could not get frame from {cam_name}")
+    
+    # Main loop
+    print("\n✅ System running! Press 'q' to quit\n")
+    
+    cv2.namedWindow("Vehicle Tracking System", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Vehicle Tracking System", 1920, 1080)
+    
+    try:
         while True:
             frames_to_show = []
             
