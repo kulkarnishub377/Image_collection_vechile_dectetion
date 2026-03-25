@@ -30,13 +30,11 @@ import os
 
 # RTSP Streams
 CAMERAS = {
-    "overview": "rtsp://admin:Arya@123@125.18.39.10:5554/cam/realmonitor?channel=1&subtype=0",
-    "anpr": "rtsp://admin:BE04_ViDeS@125.18.39.10:5555/Streaming/Channels/101",
-    "ptz": "rtsp://admin:Arya_123@125.18.39.10:554/cam/realmonitor?channel=1&subtype=0"
+    #put yours rtsp Stream
 }
 
 # Model settings
-MODEL_PATH = "bestv4.pt"
+MODEL_PATH = "#put here you vechile dection model ( yolov8n.pt)"
 CONFIDENCE = 0.5
 IOU_THRESHOLD = 0.45
 
@@ -55,7 +53,7 @@ RTSP_TRANSPORT = "tcp"  # More reliable than UDP
 RECONNECT_DELAY = 1.0  # Fast reconnection
 
 # Vehicle classes
-VEHICLE_CLASSES = ['auto_rickshaw', 'bike', 'bus', 'car', 'mini_bus', 'tractor', 'truck']
+VEHICLE_CLASSES = [#see vechile class form the yolov8n.pt]
 
 # Global counters
 GLOBAL_SAVED_COUNT = 0
